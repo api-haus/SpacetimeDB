@@ -32,13 +32,15 @@ fn criterion_benchmark(c: &mut Criterion) {
     bench_suite::<sqlite::SQLite>(c, true).unwrap();
     bench_suite::<spacetime_raw::SpacetimeRaw>(c, true).unwrap();
     bench_suite::<spacetime_module::SpacetimeModule<Rust>>(c, true).unwrap();
-    bench_suite::<spacetime_module::SpacetimeModule<Csharp>>(c, true).unwrap();
+    // TEMP-LOCAL (revert before commit): C# wasi runtime pack uninstallable without root; skip so it doesn't panic-abort the TS arm.
+    // bench_suite::<spacetime_module::SpacetimeModule<Csharp>>(c, true).unwrap();
     bench_suite::<spacetime_module::SpacetimeModule<TypeScript>>(c, true).unwrap();
 
     bench_suite::<sqlite::SQLite>(c, false).unwrap();
     bench_suite::<spacetime_raw::SpacetimeRaw>(c, false).unwrap();
     bench_suite::<spacetime_module::SpacetimeModule<Rust>>(c, false).unwrap();
-    bench_suite::<spacetime_module::SpacetimeModule<Csharp>>(c, false).unwrap();
+    // TEMP-LOCAL (revert before commit): C# wasi runtime pack uninstallable without root; skip so it doesn't panic-abort the TS arm.
+    // bench_suite::<spacetime_module::SpacetimeModule<Csharp>>(c, false).unwrap();
     bench_suite::<spacetime_module::SpacetimeModule<TypeScript>>(c, false).unwrap();
 }
 

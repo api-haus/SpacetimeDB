@@ -31,7 +31,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     serialize_benchmarks::<u64_u64_u32>(c);
 
     custom_benchmarks::<Rust>(c);
-    custom_benchmarks::<Csharp>(c);
+    // TEMP-LOCAL (revert before commit): C# wasi runtime pack uninstallable without root; skip so it doesn't panic-abort the TS arm.
+    // custom_benchmarks::<Csharp>(c);
     custom_benchmarks::<TypeScript>(c);
 }
 
