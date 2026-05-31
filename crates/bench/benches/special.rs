@@ -10,7 +10,7 @@ use spacetimedb_lib::{bsatn::ToBsatn as _, ProductValue};
 use spacetimedb_schema::schema::TableSchema;
 use spacetimedb_schema::table_name::TableName;
 use spacetimedb_table::page_pool::PagePool;
-use spacetimedb_testing::modules::{Csharp, ModuleLanguage, Rust, TypeScript};
+use spacetimedb_testing::modules::{Csharp, ModuleLanguage, Rust, TypeScript, TypeScriptPerryMix};
 use std::sync::Arc;
 use std::sync::OnceLock;
 
@@ -26,14 +26,11 @@ use tikv_jemallocator::Jemalloc;
 static GLOBAL: Jemalloc = Jemalloc;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    serialize_benchmarks::<u32_u64_str>(c);
-    serialize_benchmarks::<u32_u64_u64>(c);
-    serialize_benchmarks::<u64_u64_u32>(c);
-
+    // TEMP-PERRY-BENCH: Only running Perry + Rust arms to avoid TS SDK table panics
     custom_benchmarks::<Rust>(c);
-    // TEMP-LOCAL (revert before commit): C# wasi runtime pack uninstallable without root; skip so it doesn't panic-abort the TS arm.
-    // custom_benchmarks::<Csharp>(c);
-    custom_benchmarks::<TypeScript>(c);
+
+    // Perry AOT cpu_mix — narrow entry calling only the mix reducer
+    perry_cpu_mix_bench::<TypeScriptPerryMix>(c);
 }
 
 fn custom_benchmarks<L: ModuleLanguage>(c: &mut Criterion) {
@@ -104,6 +101,18 @@ fn custom_db_benchmarks<L: ModuleLanguage>(m: &SpacetimeModule<L>, c: &mut Crite
                 .iter(|| async { m.module.call_reducer_binary("run_game_ia_loop", &args).await.unwrap() })
         });
     }
+}
+
+/// Perry AOT cpu_mix bench — narrow entry for the single-reducer Perry module.
+/// Calls the `mix` reducer (a 100k-iteration xorshift loop) to measure AOT
+/// compute vs V8 JIT on the same Criterion clock.
+fn perry_cpu_mix_bench<L: ModuleLanguage>(c: &mut Criterion) {
+    let m = SpacetimeModule::<L>::build(true).unwrap();
+    let mut group = c.benchmark_group(format!("special/{}", SpacetimeModule::<L>::name()));
+    group.bench_function("cpu_mix", |b| {
+        b.to_async(&m)
+            .iter(|| async { m.module.call_reducer_binary("mix", &[].into()).await.unwrap() })
+    });
 }
 
 fn serialize_benchmarks<

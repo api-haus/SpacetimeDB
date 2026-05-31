@@ -11,7 +11,7 @@ use spacetimedb_bench::{
 };
 use spacetimedb_lib::sats::AlgebraicType;
 use spacetimedb_primitives::ColId;
-use spacetimedb_testing::modules::{Csharp, Rust, TypeScript};
+use spacetimedb_testing::modules::{Csharp, Rust, TypeScript, TypeScriptPerryEmpty};
 
 #[cfg(target_env = "msvc")]
 #[global_allocator]
@@ -29,19 +29,13 @@ lazy_static! {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    bench_suite::<sqlite::SQLite>(c, true).unwrap();
-    bench_suite::<spacetime_raw::SpacetimeRaw>(c, true).unwrap();
+    // TEMP-PERRY-BENCH: Only running Perry + Rust arms to avoid TS SDK table panics
     bench_suite::<spacetime_module::SpacetimeModule<Rust>>(c, true).unwrap();
-    // TEMP-LOCAL (revert before commit): C# wasi runtime pack uninstallable without root; skip so it doesn't panic-abort the TS arm.
-    // bench_suite::<spacetime_module::SpacetimeModule<Csharp>>(c, true).unwrap();
-    bench_suite::<spacetime_module::SpacetimeModule<TypeScript>>(c, true).unwrap();
+    // Perry AOT — narrow entry, only runs `empty` (single-reducer module lacks table reducers)
+    perry_empty_bench::<spacetime_module::SpacetimeModule<TypeScriptPerryEmpty>>(c, true).unwrap();
 
-    bench_suite::<sqlite::SQLite>(c, false).unwrap();
-    bench_suite::<spacetime_raw::SpacetimeRaw>(c, false).unwrap();
     bench_suite::<spacetime_module::SpacetimeModule<Rust>>(c, false).unwrap();
-    // TEMP-LOCAL (revert before commit): C# wasi runtime pack uninstallable without root; skip so it doesn't panic-abort the TS arm.
-    // bench_suite::<spacetime_module::SpacetimeModule<Csharp>>(c, false).unwrap();
-    bench_suite::<spacetime_module::SpacetimeModule<TypeScript>>(c, false).unwrap();
+    perry_empty_bench::<spacetime_module::SpacetimeModule<TypeScriptPerryEmpty>>(c, false).unwrap();
 }
 
 #[inline(never)]
@@ -158,6 +152,19 @@ fn empty<DB: BenchDatabase>(g: &mut Group, db: &mut DB) -> ResultBench<()> {
             },
         )
     });
+    Ok(())
+}
+
+/// Narrow Perry bench: only exercises `empty_transaction`, skipping table_suite
+/// (the single-reducer Perry module lacks table reducers and would panic).
+#[inline(never)]
+fn perry_empty_bench<DB: BenchDatabase>(c: &mut Criterion, in_memory: bool) -> ResultBench<()> {
+    let mut db = DB::build(in_memory)?;
+    let param_db_name = DB::name();
+    let param_in_memory = if in_memory { "mem" } else { "disk" };
+    let db_params = format!("{param_db_name}/{param_in_memory}");
+    let mut g = c.benchmark_group(&db_params);
+    empty(&mut g, &mut db)?;
     Ok(())
 }
 

@@ -176,6 +176,19 @@ impl CompiledModule {
         }
     }
 
+    /// Create a pre-built module from a `.wasm` file on disk, forcing
+    /// `host_type = HostType::Wasm`. Used for Perry-compiled modules that
+    /// bypass the CLI's build+language-detection path.
+    pub fn from_prebuilt(name: String, path: PathBuf) -> Self {
+        assert!(path.exists(), "Perry prebuilt artifact not found: {}", path.display());
+        Self {
+            name,
+            path,
+            host_type: HostType::Wasm,
+            program_bytes: OnceLock::new(),
+        }
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -399,6 +412,56 @@ impl ModuleLanguage for Cpp {
             pub static ref MODULE: CompiledModule = CompiledModule::compile("benchmarks-cpp", COMPILATION_MODE);
         }
 
+        &MODULE
+    }
+}
+
+// --- Perry (AOT wasm32) pre-built artifacts ---
+// These bypass the CLI build path entirely, using Perry-compiled .wasm files
+// with host_type forced to Wasm. Each workload is a separate single-reducer
+// module (doc 14 §3 three-place coupling note).
+
+fn perry_artifacts_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("PERRY_BENCH_ARTIFACTS") {
+        return PathBuf::from(dir);
+    }
+    // Default: crates/bench/artifacts/perry/ relative to workspace root
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("bench")
+        .join("artifacts")
+        .join("perry")
+}
+
+pub struct TypeScriptPerryEmpty;
+
+impl ModuleLanguage for TypeScriptPerryEmpty {
+    const NAME: &'static str = "typescript-perry";
+
+    fn get_module() -> &'static CompiledModule {
+        lazy_static::lazy_static! {
+            pub static ref MODULE: CompiledModule = CompiledModule::from_prebuilt(
+                "benchmarks-ts-perry-empty".into(),
+                perry_artifacts_dir().join("empty.wasm"),
+            );
+        }
+        &MODULE
+    }
+}
+
+pub struct TypeScriptPerryMix;
+
+impl ModuleLanguage for TypeScriptPerryMix {
+    const NAME: &'static str = "typescript-perry";
+
+    fn get_module() -> &'static CompiledModule {
+        lazy_static::lazy_static! {
+            pub static ref MODULE: CompiledModule = CompiledModule::from_prebuilt(
+                "benchmarks-ts-perry-mix".into(),
+                perry_artifacts_dir().join("numk.wasm"),
+            );
+        }
         &MODULE
     }
 }
